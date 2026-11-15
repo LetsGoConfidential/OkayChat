@@ -2,7 +2,7 @@ import { BadGatewayException, BadRequestException, Body, ConflictException, Cont
 import { BullModule, InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
 import { ArrayMaxSize, IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { Channel, ConversationStatus, MessageDirection, MessageStatus, WorkspaceRole } from '@okaychat/db';
+import { CampaignRecipientStatus, CampaignStatus, Channel, ConversationStatus, MessageDirection, MessageStatus, WorkspaceRole } from '@okaychat/db';
 import { Request, Response } from 'express';
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { AccessGuard, AuthModule } from './auth';
@@ -277,11 +277,26 @@ class MessagingService {
     const states: Record<string, MessageStatus> = { sent: MessageStatus.SENT, delivered: MessageStatus.DELIVERED, read: MessageStatus.READ, failed: MessageStatus.FAILED };
     const mapped = states[status?.status];
     if (!mapped || !status?.id) return;
-    const messages = await this.db.message.findMany({ where: { providerId: status.id }, select: { id: true, conversation: { select: { workspaceId: true } } } });
+    const messages = await this.db.message.findMany({ where: { providerId: status.id }, select: { id: true, payload: true, conversation: { select: { workspaceId: true } } } });
     if (!messages.length) return;
     await this.db.message.updateMany({ where: { id: { in: messages.map(message => message.id) } }, data: { status: mapped, ...(status.status === 'failed' ? { payload: { failure: JSON.stringify(status.errors ?? []).slice(0, 800) } } : {}) } });
     await this.db.outboundOutbox.updateMany({ where: { messageId: { in: messages.map(message => message.id) } }, data: status.status === 'failed' ? { status: 'FAILED', lastError: JSON.stringify(status.errors ?? []).slice(0, 400) } : { status: 'COMPLETED', lastError: null } });
+    if (status.status === 'failed') {
+      for (const message of messages) {
+        const payload = message.payload && typeof message.payload === 'object' && !Array.isArray(message.payload) ? message.payload as Record<string, unknown> : {};
+        const campaignRecipientId = typeof payload.campaignRecipientId === 'string' ? payload.campaignRecipientId : null;
+        if (!campaignRecipientId) continue;
+        await this.db.campaignRecipient.updateMany({ where: { id: campaignRecipientId, workspaceId: message.conversation.workspaceId, status: { in: [CampaignRecipientStatus.QUEUED, CampaignRecipientStatus.SENT] } }, data: { status: CampaignRecipientStatus.FAILED, error: JSON.stringify(status.errors ?? []).slice(0, 400) || 'WhatsApp delivery failed' } });
+        const campaignId = typeof payload.campaignId === 'string' ? payload.campaignId : null;
+        if (campaignId) await this.completeCampaignIfDrained(campaignId, message.conversation.workspaceId);
+      }
+    }
     for (const workspaceId of new Set(messages.map(message => message.conversation.workspaceId))) await this.realtime.publish(workspaceId, { type: 'inbox.changed', messageId: messages[0].id });
+  }
+
+  private async completeCampaignIfDrained(campaignId: string, workspaceId: string) {
+    const unfinished = await this.db.campaignRecipient.count({ where: { campaignId, workspaceId, status: { in: [CampaignRecipientStatus.PENDING, CampaignRecipientStatus.QUEUED] } } });
+    if (!unfinished) await this.db.campaign.updateMany({ where: { id: campaignId, workspaceId, status: CampaignStatus.RUNNING }, data: { status: CampaignStatus.COMPLETED } });
   }
 
   private async applyIncoming(channel: Channel, incoming: any, profileName?: string) {
@@ -376,17 +391,33 @@ class OutboundMessageProcessor extends WorkerHost {
     const message = await this.db.message.findUnique({ where: { id: job.data.messageId }, include: { conversation: { include: { contact: true } } } });
     if (!message || message.status !== MessageStatus.QUEUED) return { skipped: true };
     const conversation = message.conversation;
+    const payload = message.payload && typeof message.payload === 'object' && !Array.isArray(message.payload) ? message.payload as Record<string, unknown> : {};
+    const campaignRecipientId = typeof payload.campaignRecipientId === 'string' ? payload.campaignRecipientId : null;
+    if (campaignRecipientId) {
+      const recipient = await this.db.campaignRecipient.findFirst({ where: { id: campaignRecipientId, workspaceId: job.data.workspaceId }, include: { contact: { select: { whatsappConsent: true } } } });
+      if (!recipient || recipient.status !== CampaignRecipientStatus.QUEUED || recipient.contact.whatsappConsent !== 'OPTED_IN') {
+        const reason = recipient ? 'Consent was withdrawn before provider delivery.' : 'Campaign recipient is no longer available; delivery was cancelled.';
+        await this.db.message.update({ where: { id: message.id }, data: { status: MessageStatus.FAILED, payload: { ...payload, failure: reason } } });
+        await this.db.outboundOutbox.updateMany({ where: { messageId: message.id }, data: { status: 'FAILED', lastError: reason } });
+        if (recipient) await this.db.campaignRecipient.updateMany({ where: { id: campaignRecipientId, workspaceId: job.data.workspaceId, status: CampaignRecipientStatus.QUEUED }, data: { status: CampaignRecipientStatus.SKIPPED, error: reason } });
+        if (typeof payload.campaignId === 'string') await this.completeCampaignIfDrained(payload.campaignId, job.data.workspaceId);
+        await this.realtime.publish(job.data.workspaceId, { type: 'inbox.changed', conversationId: conversation.id, messageId: message.id });
+        return { skipped: true, reason };
+      }
+    }
     if (!conversation.channelId) throw new Error('Conversation has no connected WhatsApp channel');
     const channel = await this.db.channel.findFirst({ where: { id: conversation.channelId, workspaceId: job.data.workspaceId, status: 'CONNECTED' } });
     if (!channel) throw new Error('Connected WhatsApp channel not found');
     let providerMessageId: string;
     try {
       if (message.type === 'TEMPLATE') {
-        const payload = message.payload as unknown as { templateName?: string; language?: string; bodyParameters?: string[] };
-        if (!payload.templateName || !payload.language) throw new Error('Template details are missing from the queued message');
-        const template = await this.db.messageTemplate.findFirst({ where: { channelId: channel.id, name: payload.templateName, language: payload.language, status: 'APPROVED' }, select: { id: true } });
+        const templateName = typeof payload.templateName === 'string' ? payload.templateName : '';
+        const language = typeof payload.language === 'string' ? payload.language : '';
+        const bodyParameters = Array.isArray(payload.bodyParameters) ? payload.bodyParameters.filter((value): value is string => typeof value === 'string') : [];
+        if (!templateName || !language) throw new Error('Template details are missing from the queued message');
+        const template = await this.db.messageTemplate.findFirst({ where: { channelId: channel.id, name: templateName, language, status: 'APPROVED' }, select: { id: true } });
         if (!template) throw new Error('Template is no longer approved on this WhatsApp channel');
-        const sent = await this.provider.sendTemplate({ phoneNumberId: channel.phoneNumberId, accessToken: this.tokens.decrypt(channel.encryptedAccessToken), recipient: conversation.contact.phone, templateName: payload.templateName, language: payload.language, bodyParameters: payload.bodyParameters ?? [] });
+        const sent = await this.provider.sendTemplate({ phoneNumberId: channel.phoneNumberId, accessToken: this.tokens.decrypt(channel.encryptedAccessToken), recipient: conversation.contact.phone, templateName, language, bodyParameters });
         providerMessageId = sent.providerMessageId;
       } else {
         if (!message.body) throw new Error('Message text is missing');
@@ -399,16 +430,29 @@ class OutboundMessageProcessor extends WorkerHost {
         const oldPayload = message.payload && typeof message.payload === 'object' && !Array.isArray(message.payload) ? message.payload as Record<string, unknown> : {};
         await this.db.message.update({ where: { id: message.id }, data: { status: MessageStatus.FAILED, payload: { ...oldPayload, failure: cause instanceof Error ? cause.message.slice(0, 400) : 'Provider error' } } });
         await this.db.outboundOutbox.updateMany({ where: { messageId: message.id }, data: { status: 'FAILED', lastError: cause instanceof Error ? cause.message.slice(0, 400) : 'Provider error' } });
+        if (campaignRecipientId) {
+          await this.db.campaignRecipient.updateMany({ where: { id: campaignRecipientId, workspaceId: job.data.workspaceId, status: CampaignRecipientStatus.QUEUED }, data: { status: CampaignRecipientStatus.FAILED, error: cause instanceof Error ? cause.message.slice(0, 400) : 'Provider error' } });
+          if (typeof payload.campaignId === 'string') await this.completeCampaignIfDrained(payload.campaignId, job.data.workspaceId);
+        }
         await this.realtime.publish(job.data.workspaceId, { type: 'inbox.changed', conversationId: conversation.id, messageId: message.id });
       }
       throw cause instanceof Error ? cause : new Error('WhatsApp delivery failed');
     }
     const sentMessage = await this.db.message.update({ where: { id: message.id }, data: { status: MessageStatus.SENT, providerId: providerMessageId } });
     await this.db.outboundOutbox.updateMany({ where: { messageId: message.id }, data: { status: 'COMPLETED', lastError: null } });
+    if (campaignRecipientId) {
+      await this.db.campaignRecipient.updateMany({ where: { id: campaignRecipientId, workspaceId: job.data.workspaceId, status: CampaignRecipientStatus.QUEUED }, data: { status: CampaignRecipientStatus.SENT, error: null } });
+      if (typeof payload.campaignId === 'string') await this.completeCampaignIfDrained(payload.campaignId, job.data.workspaceId);
+    }
     await this.db.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } });
     await this.db.auditEvent.create({ data: { workspaceId: job.data.workspaceId, actorId: job.data.actorId, action: message.type === 'TEMPLATE' ? 'MESSAGE_TEMPLATE_SENT' : 'MESSAGE_SENT', entityType: 'Message', entityId: message.id, metadata: { conversationId: conversation.id, providerMessageId } } });
     await this.realtime.publish(job.data.workspaceId, { type: 'inbox.changed', conversationId: conversation.id, messageId: message.id });
     return { messageId: sentMessage.id, providerMessageId };
+  }
+
+  private async completeCampaignIfDrained(campaignId: string, workspaceId: string) {
+    const unfinished = await this.db.campaignRecipient.count({ where: { campaignId, workspaceId, status: { in: [CampaignRecipientStatus.PENDING, CampaignRecipientStatus.QUEUED] } } });
+    if (!unfinished) await this.db.campaign.updateMany({ where: { id: campaignId, workspaceId, status: CampaignStatus.RUNNING }, data: { status: CampaignStatus.COMPLETED } });
   }
 }
 

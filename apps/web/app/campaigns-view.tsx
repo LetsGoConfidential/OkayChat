@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Check, FileText, Megaphone, Plus, Search, Users } from 'lucide-react';
+import { Check, FileText, Megaphone, Plus, Search, Send, Users } from 'lucide-react';
 import './campaigns.css';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
@@ -10,6 +10,7 @@ type Campaign = { id: string; name: string; status: string; templateName: string
 type ApprovedTemplate = { id: string; name: string; language: string; status: string; displayPhoneNumber: string | null };
 type Contact = { id: string; name: string; phone: string; company: string | null; tags: string[]; whatsappConsent: 'UNKNOWN' | 'OPTED_IN' | 'OPTED_OUT' };
 type Eligibility = { contacts: { selected: number; optedIn: number; optedOut: number; unknown: number; missing: number }; template: { selected: boolean; approved: boolean; channelConnected: boolean }; audienceEligible: boolean; readyForDispatch: boolean; blockers: string[] };
+type CampaignProgress = { total: number; sent: number; failed: number; skipped: number; pending: number; status: string };
 
 export function CampaignsView({ onToast }: { onToast: (message: string) => void }) {
   const [items, setItems] = useState<Campaign[]>([]);
@@ -23,10 +24,14 @@ export function CampaignsView({ onToast }: { onToast: (message: string) => void 
   const [loading, setLoading] = useState(true);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState<Eligibility | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  const [progressId, setProgressId] = useState<string | null>(null);
+  const [progressData, setProgressData] = useState<CampaignProgress | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
@@ -109,6 +114,37 @@ export function CampaignsView({ onToast }: { onToast: (message: string) => void 
     finally { setReviewLoading(false); }
   };
 
+  const launchCampaign = async (campaign: Campaign) => {
+    setReviewId(campaign.id); setReviewData(null); setReviewError(''); setReviewLoading(true);
+    try {
+      const eligibilityResponse = await fetch(`${API}/campaigns/${campaign.id}/eligibility`, { credentials: 'include' });
+      const eligibility = await eligibilityResponse.json().catch(() => ({})) as Eligibility;
+      if (!eligibilityResponse.ok) throw new Error((eligibility as unknown as { message?: string }).message ?? 'Could not check campaign readiness');
+      setReviewData(eligibility);
+      setReviewLoading(false);
+      if (!eligibility.readyForDispatch) { onToast('Review the campaign blockers before launch'); return; }
+      if (!window.confirm(`Launch “${campaign.name}” to ${eligibility.contacts.selected} opted-in contact(s)? Consent will be checked again just before delivery. This action cannot be undone.`)) return;
+      setDispatching(true); setError('');
+      const response = await fetch(`${API}/campaigns/${campaign.id}/dispatch`, { method: 'POST', credentials: 'include' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(Array.isArray(result.message) ? result.message.join(', ') : result.message ?? 'Could not launch campaign');
+      setProgressId(campaign.id); setProgressData(result); setReviewId(null); setReviewData(null); onToast('Campaign queued for delivery'); await refresh();
+    } catch (cause) { setReviewError(cause instanceof Error ? cause.message : 'Could not launch campaign'); }
+    finally { setReviewLoading(false); setDispatching(false); }
+  };
+
+  const loadProgress = async (campaignId: string) => {
+    if (progressId === campaignId) { setProgressId(null); setProgressData(null); return; }
+    setProgressId(campaignId); setProgressData(null); setProgressLoading(true);
+    try {
+      const response = await fetch(`${API}/campaigns/${campaignId}/progress`, { credentials: 'include' });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message ?? 'Could not load campaign progress');
+      setProgressData(result);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load campaign progress'); }
+    finally { setProgressLoading(false); }
+  };
+
   return <section className="campaigns-view">
     <div className="campaign-intro"><div className="campaign-intro-icon"><Megaphone size={20}/></div><div><b>Plan your next campaign</b><p>Create a WhatsApp campaign draft, choose its approved template, and define the audience.</p></div></div>
     <form className="campaign-create" onSubmit={create}>
@@ -125,8 +161,8 @@ export function CampaignsView({ onToast }: { onToast: (message: string) => void 
       </div>
     </form>
     {error && <p className="campaign-error" role="alert">{error}</p>}
-    <div className="campaign-list-heading"><div><h2>Your campaigns</h2><p>Drafts are saved to this workspace.</p></div><span>{items.length} {items.length === 1 ? 'campaign' : 'campaigns'}</span></div>
-    {loading ? <div className="campaign-empty">Loading campaigns…</div> : items.length ? <div className="campaign-list">{items.map(item => <div className="campaign-item" key={item.id}><article className="campaign-row"><div className="campaign-row-icon"><FileText size={18}/></div><div className="campaign-row-main"><b>{item.name}</b><small>{item.templateName ? `Template: ${item.templateName} · ${item.templateLanguage ?? ''}` : 'No template selected'} · Created {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(item.createdAt))}</small></div><div className="campaign-audience"><Users size={14}/>{item.audience?.contactIds?.length ?? 0} contacts</div>{item.status === 'DRAFT' && <button className="campaign-review-button" type="button" onClick={() => editCampaign(item)}>Edit draft</button>}<button className="campaign-review-button" type="button" onClick={() => void reviewAudience(item.id)}>{reviewId === item.id ? 'Close review' : 'Review audience'}</button><span className="campaign-status">{item.status.toLowerCase()}</span></article>{reviewId === item.id && <div className="eligibility-review">{reviewLoading ? <span>Reviewing audience…</span> : reviewError ? <span className="campaign-error">{reviewError}</span> : reviewData && <><div className="eligibility-title"><b>Audience eligibility</b><span className={reviewData.audienceEligible ? 'eligibility-good' : 'eligibility-blocked'}>{reviewData.audienceEligible ? 'All selected contacts opted in' : 'Audience needs attention'}</span></div><div className="eligibility-counts"><span><b>{reviewData.contacts.selected}</b>Selected</span><span><b>{reviewData.contacts.optedIn}</b>Opted in</span><span><b>{reviewData.contacts.optedOut}</b>Opted out</span><span><b>{reviewData.contacts.unknown}</b>Unknown</span><span><b>{reviewData.contacts.missing}</b>Missing</span></div><div className="eligibility-template">Template: {reviewData.template.approved ? 'approved' : 'not selected or unavailable'} · Channel: {reviewData.template.channelConnected ? 'connected' : 'not connected'}</div><ul>{reviewData.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul></>}</div>}</div>)}</div> : <div className="campaign-empty"><Megaphone size={22}/><b>No campaigns yet</b><span>Create a draft to start planning your first campaign.</span></div>}
-    <p className="campaign-footnote">Review the opted-in count before preparing an audience. Only send to customers with recorded WhatsApp consent; dispatch remains disabled while delivery safeguards are completed.</p>
+    <div className="campaign-list-heading"><div><h2>Your campaigns</h2><p>Drafts and delivery progress for this workspace.</p></div><span>{items.length} {items.length === 1 ? 'campaign' : 'campaigns'}</span></div>
+    {loading ? <div className="campaign-empty">Loading campaigns…</div> : items.length ? <div className="campaign-list">{items.map(item => <div className="campaign-item" key={item.id}><article className="campaign-row"><div className="campaign-row-icon"><FileText size={18}/></div><div className="campaign-row-main"><b>{item.name}</b><small>{item.templateName ? `Template: ${item.templateName} · ${item.templateLanguage ?? ''}` : 'No template selected'} · Created {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(item.createdAt))}</small></div><div className="campaign-audience"><Users size={14}/>{item.audience?.contactIds?.length ?? 0} contacts</div>{item.status === 'DRAFT' && <button className="campaign-review-button" type="button" onClick={() => editCampaign(item)}>Edit draft</button>}{item.status === 'DRAFT' ? <button className="campaign-review-button" type="button" onClick={() => void reviewAudience(item.id)}>{reviewId === item.id ? 'Close review' : 'Review audience'}</button> : ['RUNNING', 'COMPLETED'].includes(item.status) ? <button className="campaign-review-button" type="button" onClick={() => void loadProgress(item.id)}>{progressId === item.id ? 'Close progress' : 'View progress'}</button> : null}<span className={`campaign-status campaign-status-${item.status.toLowerCase()}`}>{item.status.toLowerCase()}</span></article>{reviewId === item.id && <div className="eligibility-review">{reviewLoading ? <span>Reviewing audience…</span> : reviewError ? <span className="campaign-error">{reviewError}</span> : reviewData && <><div className="eligibility-title"><b>Audience eligibility</b><span className={reviewData.audienceEligible ? 'eligibility-good' : 'eligibility-blocked'}>{reviewData.audienceEligible ? 'All selected contacts opted in' : 'Audience needs attention'}</span></div><div className="eligibility-counts"><span><b>{reviewData.contacts.selected}</b>Selected</span><span><b>{reviewData.contacts.optedIn}</b>Opted in</span><span><b>{reviewData.contacts.optedOut}</b>Opted out</span><span><b>{reviewData.contacts.unknown}</b>Unknown</span><span><b>{reviewData.contacts.missing}</b>Missing</span></div><div className="eligibility-template">Template: {reviewData.template.approved ? 'approved' : 'not selected or unavailable'} · Channel: {reviewData.template.channelConnected ? 'connected' : 'not connected'}</div><ul>{reviewData.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>{reviewData.readyForDispatch && <button className="campaign-launch-button" type="button" onClick={() => void launchCampaign(item)} disabled={dispatching}>{dispatching ? 'Checking readiness…' : 'Launch campaign'} <Send size={14}/></button>}</>}</div>}{progressId === item.id && <div className="eligibility-review campaign-progress">{progressLoading ? <span>Loading progress…</span> : progressData && <><div className="eligibility-title"><b>Delivery progress</b><span>{progressData.status.toLowerCase()}</span></div><div className="eligibility-counts"><span><b>{progressData.total}</b>Total</span><span><b>{progressData.sent}</b>Sent</span><span><b>{progressData.pending}</b>In queue</span><span><b>{progressData.failed}</b>Failed</span><span><b>{progressData.skipped}</b>Skipped</span></div></>}</div>}</div>)}</div> : <div className="campaign-empty"><Megaphone size={22}/><b>No campaigns yet</b><span>Create a draft to start planning your first campaign.</span></div>}
+    <p className="campaign-footnote">Launch requires recorded opt-in for every selected contact. Consent is checked again just before delivery. Campaigns currently support approved templates without dynamic variables.</p>
   </section>;
 }

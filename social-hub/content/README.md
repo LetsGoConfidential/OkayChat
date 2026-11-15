@@ -1,6 +1,6 @@
 # OkayChat.in social content desk
 
-Research and draft package for owner review. Start with [competitor audit and creative direction](competitor-audit.md), then [30-day calendar](30-day-calendar.md) and [week one post-ready drafts](week-one-drafts.md). Use [review and publishing checklist](review-checklist.md) before anything is posted.
+Research and draft package for owner review. Start with [competitor audit and creative direction](competitor-audit.md), then [30-day calendar](30-day-calendar.md), [week one post-ready drafts](week-one-drafts.md), and the [post-ready copy queue for Days 9–30](days-09-to-30-copy.md). The [dated daily draft and visual](daily-drafts/2026-11-15-day-08-admissions-enquiry.md) is available. The [15 November admissions reel review and campaign pack](campaigns/2026-11-15-admissions-reel-review.md) contains the three coordinated grid assets and platform-specific copy. Use [review and publishing checklist](review-checklist.md) before anything is posted.
 
 ## Editorial guardrails
 

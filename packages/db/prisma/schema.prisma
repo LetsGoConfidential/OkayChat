@@ -52,6 +52,13 @@ enum OutboxStatus {
   COMPLETED
   FAILED
 }
+enum CampaignRecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
 enum WhatsappConsent {
   UNKNOWN
   OPTED_IN
@@ -99,6 +106,7 @@ model Workspace {
   conversations Conversation[]
   leads       Lead[]
   campaigns   Campaign[]
+  campaignRecipients CampaignRecipient[]
   automations Automation[]
   auditEvents AuditEvent[]
   outboxJobs  OutboundOutbox[]
@@ -170,6 +178,7 @@ model Contact {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   conversations Conversation[]
   leads       Lead[]
+  campaignRecipients CampaignRecipient[]
   @@unique([workspaceId, phone])
   @@unique([workspaceId, id])
   @@index([workspaceId, createdAt])
@@ -220,6 +229,7 @@ model Message {
   createdAt      DateTime @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   outboxJob      OutboundOutbox?
+  campaignRecipient CampaignRecipient?
   @@index([conversationId, createdAt])
   @@unique([conversationId, idempotencyKey])
 }
@@ -281,7 +291,28 @@ model Campaign {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recipients  CampaignRecipient[]
+  @@unique([workspaceId, id])
   @@index([workspaceId, status])
+}
+
+model CampaignRecipient {
+  id          String   @id @default(cuid())
+  workspaceId String
+  campaignId  String
+  contactId   String
+  messageId   String?  @unique
+  status      CampaignRecipientStatus @default(PENDING)
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign    Campaign @relation(fields: [workspaceId, campaignId], references: [workspaceId, id], onDelete: Cascade)
+  contact     Contact @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  message     Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  @@unique([campaignId, contactId])
+  @@index([workspaceId, status, createdAt])
+  @@index([campaignId, status])
 }
 
 model Automation {

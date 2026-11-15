@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MANAGER
+  AGENT
+}
+enum ConversationStatus {
+  OPEN
+  SNOOZED
+  CLOSED
+}
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  SITE_VISIT
+  PROPOSAL
+  WON
+  LOST
+}
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+enum OutboxStatus {
+  PENDING
+  ENQUEUED
+  COMPLETED
+  FAILED
+}
+enum WhatsappConsent {
+  UNKNOWN
+  OPTED_IN
+  OPTED_OUT
+}
+
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  memberships  Membership[]
+  auditEvents  AuditEvent[]
+  sessions     Session[]
+  outboxJobs   OutboundOutbox[]
+  invitesCreated WorkspaceInvite[] @relation("WorkspaceInviteCreator")
+  conversationNotes ConversationNote[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  activeWorkspaceId String
+  refreshHash  String   @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeWorkspace Workspace @relation(fields: [activeWorkspaceId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+
+model Workspace {
+  id          String @id @default(cuid())
+  name        String
+  slug        String @unique
+  timezone    String @default("Asia/Kolkata")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  memberships Membership[]
+  sessions    Session[]
+  channels    Channel[]
+  contacts    Contact[]
+  conversations Conversation[]
+  leads       Lead[]
+  campaigns   Campaign[]
+  automations Automation[]
+  auditEvents AuditEvent[]
+  outboxJobs  OutboundOutbox[]
+  invites     WorkspaceInvite[]
+  conversationNotes ConversationNote[]
+}
+
+model Membership {
+  id          String @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(AGENT)
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceInvite {
+  id          String   @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole
+  tokenHash   String   @unique
+  createdById String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User?    @relation("WorkspaceInviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  @@unique([workspaceId, email])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, expiresAt, acceptedAt, revokedAt])
+}
+
+model Channel {
+  id                    String @id @default(cuid())
+  workspaceId           String
+  provider              String @default("META_CLOUD_API")
+  phoneNumberId         String @unique
+  businessAccountId     String
+  displayPhoneNumber    String
+  encryptedAccessToken  String
+  status                String @default("PENDING")
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations         Conversation[]
+  templates             MessageTemplate[]
+  createdAt             DateTime @default(now())
+  @@index([workspaceId])
+}
+
+model Contact {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+  phone       String
+  email       String?
+  company     String?
+  source      String?
+  tags        String[] @default([])
+  attributes  Json @default("{}")
+  whatsappConsent       WhatsappConsent @default(UNKNOWN)
+  whatsappConsentAt     DateTime?
+  whatsappConsentSource String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  leads       Lead[]
+  @@unique([workspaceId, phone])
+  @@unique([workspaceId, id])
+  @@index([workspaceId, createdAt])
+}
+
+model Conversation {
+  id          String @id @default(cuid())
+  workspaceId String
+  contactId   String
+  channelId   String?
+  assignedTo  String?
+  status      ConversationStatus @default(OPEN)
+  lastMessageAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel     Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  contact     Contact @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  messages    Message[]
+  notes       ConversationNote[]
+  @@unique([workspaceId, id])
+  @@index([workspaceId, status, lastMessageAt])
+  @@index([workspaceId, contactId, lastMessageAt])
+}
+
+model ConversationNote {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  conversationId String
+  authorId       String?
+  body           String   @db.VarChar(2000)
+  createdAt      DateTime @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [workspaceId, conversationId], references: [workspaceId, id], onDelete: Cascade)
+  author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, conversationId, createdAt])
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  providerId     String? @unique
+  idempotencyKey String?
+  direction      MessageDirection
+  status         MessageStatus @default(QUEUED)
+  type           String @default("TEXT")
+  body           String?
+  payload        Json @default("{}")
+  createdAt      DateTime @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  outboxJob      OutboundOutbox?
+  @@index([conversationId, createdAt])
+  @@unique([conversationId, idempotencyKey])
+}
+
+model OutboundOutbox {
+  id          String @id @default(cuid())
+  messageId   String @unique
+  workspaceId String
+  actorId     String?
+  status      OutboxStatus @default(PENDING)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  message     Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([status, updatedAt])
+  @@index([workspaceId, createdAt])
+}
+
+model MessageTemplate {
+  id         String   @id @default(cuid())
+  channelId  String
+  name       String
+  language   String
+  category   String?
+  status     String
+  components Json     @default("[]")
+  syncedAt   DateTime @default(now())
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  @@unique([channelId, name, language])
+  @@index([channelId, status])
+}
+
+model Lead {
+  id          String @id @default(cuid())
+  workspaceId String
+  contactId   String
+  title       String
+  stage       LeadStage @default(NEW)
+  value       Decimal? @db.Decimal(12,2)
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact     Contact @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  @@index([workspaceId, stage, updatedAt])
+}
+
+model Campaign {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+  status      CampaignStatus @default(DRAFT)
+  templateName String?
+  templateLanguage String?
+  audience    Json @default("{}")
+  scheduledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, status])
+}
+
+model Automation {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+  enabled     Boolean @default(false)
+  trigger     Json
+  actions     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, enabled])
+}
+
+model AuditEvent {
+  id          String @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json @default("{}")
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, createdAt])
+}

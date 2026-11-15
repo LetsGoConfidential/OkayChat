@@ -2,7 +2,7 @@ import { BadGatewayException, BadRequestException, Body, ConflictException, Cont
 import { BullModule, InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
 import { ArrayMaxSize, IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { Channel, ConversationStatus, MessageDirection, MessageStatus, WorkspaceRole } from '@prisma/client';
+import { Channel, ConversationStatus, MessageDirection, MessageStatus, WorkspaceRole } from '@okaychat/db';
 import { Request, Response } from 'express';
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { AccessGuard, AuthModule } from './auth';

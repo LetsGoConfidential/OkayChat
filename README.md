@@ -6,22 +6,22 @@ OkayChat is a WhatsApp-first business communication workspace: conversations, co
 
 - `apps/web`: Next.js + React + TypeScript user interface. Includes a responsive Home dashboard, persisted Inbox, contacts/leads, campaigns, automations, analytics, template sync, and manual WhatsApp Cloud API connection setup.
 - `apps/api`: NestJS REST API with registration, login, rotating refresh sessions, logout, protected current-user and workspace endpoints, and health endpoints.
-- `packages/db`: PostgreSQL schema for users, sessions, workspaces, memberships, workspace invitations, Meta channel connections, contacts, conversations, messages, outbound delivery outbox, leads, campaigns, automations, and audit events.
+- `packages/db`: PostgreSQL schema, migrations, and the generated Prisma client exported as the `@okaychat/db` workspace package for API type/runtime safety.
 - `.env.example`: environment-variable names for the application and infrastructure.
 
 Account creation, login, workspace membership and invitations, contacts, leads, conversations, messages, campaign drafts, and inbound assignment automations are persisted through the API. The Leads panel presents a stage-based pipeline with contact-linked lead creation, estimated values, and persisted stage moves; only owners, admins, and managers can access lead operations. These records are scoped to the active workspace, and sensitive writes create audit events. Inbox reads/replies through the API; Open, Snoozed, and Closed filters update conversation status; internal team notes are stored and audited separately from customer messages. Authenticated SSE streams carry workspace-scoped change notifications over Redis Pub/Sub, and the web Inbox reloads affected data when events arrive. Workspace managers can assign conversations to members from the Inbox. Owners/admins can create seven-day, single-use invitation links; tokens are hashed at rest, role assignment is restricted, invitees must sign in with the invited email, and owners/admins can revoke pending invites. Invite links are displayed for manual sharing; an email delivery adapter is not configured yet. Outbound text and approved-template sends are committed with an outbox row and audit event in one database transaction, then queued in BullMQ with up to five attempts and exponential backoff. A dispatcher retries pending Redis handoffs and reconciles stale queued jobs; provider status webhooks update message and outbox states. Campaign drafts can be created with a selected workspace-scoped contact audience and approved template; the panel supports searching/selecting contacts and persists audience IDs. Contact records now store WhatsApp consent as UNKNOWN, OPTED_IN, or OPTED_OUT, along with the timestamp and source of the latest status; changes are audited. Campaign audience planning displays each contact status and the opted-in count. Campaign dispatch remains disabled until consent enforcement and delivery safeguards are implemented. Managers can create inbound-message rules that assign a conversation to a workspace member; the webhook applies this assignment only when there is no existing assignee. Analytics reports workspace counts, seven-day message activity, and contact source totals from persisted data. Owners/admins can sync WhatsApp templates from connected Meta channels; the Inbox can send approved templates with text body variables. A channel can be connected with a Meta Cloud API access token; tokens are AES-256-GCM encrypted at rest. Billing still needs persisted workflows.
 
 ## Local setup
 
-Prerequisites: Node.js 20+, npm 10+, PostgreSQL 15+, and Redis 7+.
+Prerequisites: Node.js 20+, pnpm 11+, PostgreSQL 15+, and Redis 7+.
 
 1. Copy `.env.example` to `.env` and set strong, unique secrets plus database/Redis credentials. `JWT_ACCESS_SECRET` must be present for the API to start. Set `TOKEN_ENCRYPTION_KEY` to a base64-encoded random 32-byte key (for example, generate one with Node's `crypto.randomBytes(32).toString('base64')`). Configure the Meta app secret and webhook verification token before subscribing webhooks.
-2. Install dependencies from the repository root with `npm install`.
-3. Generate the database client with `npm run db:generate`.
-4. Apply the committed PostgreSQL migrations locally with `npm run db:migrate`. Production deployments should apply them with `npm run db:deploy`; never use `migrate dev` in production.
-5. Run the web app using `npm run dev` (http://localhost:3000). Run the API in a second terminal with `npm run dev:api` (http://localhost:4000/api/v1/health).
+2. Install workspace dependencies from the repository root with `pnpm install`.
+3. Generate the database client with `pnpm db:generate`.
+4. Apply the committed PostgreSQL migrations locally with `pnpm db:migrate`. Production deployments should apply them with `pnpm db:deploy`; never use `migrate dev` in production.
+5. Run the web app using `pnpm dev` (http://localhost:3000). Run the API in a second terminal with `pnpm dev:api` (http://localhost:4000/api/v1/health).
 
-The current environment did not include npm, so dependency installation and runtime verification could not be performed here.
+Run `pnpm typecheck` to check both TypeScript applications and `pnpm build` to create production builds. Prisma Client is generated into `packages/db/generated/client` and imported by the API through the `@okaychat/db` workspace package.
 
 ## Architecture and tenant safety
 

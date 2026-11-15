@@ -1,7 +1,7 @@
 import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail, IsEnum, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { LeadStage, WhatsappConsent, WorkspaceRole } from '@prisma/client';
+import { LeadStage, WhatsappConsent, WorkspaceRole } from '@okaychat/db';
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';

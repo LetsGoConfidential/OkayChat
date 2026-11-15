@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { CampaignStatus, WorkspaceRole } from '@prisma/client';
+import { CampaignStatus, WorkspaceRole } from '@okaychat/db';
 import { ArrayMaxSize, IsArray, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';

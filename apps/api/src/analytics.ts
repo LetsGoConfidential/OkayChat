@@ -1,5 +1,5 @@
 import { Controller, Get, Injectable, Module, Req, UseGuards } from '@nestjs/common';
-import { LeadStage, MessageDirection, WorkspaceRole } from '@prisma/client';
+import { LeadStage, MessageDirection, WorkspaceRole } from '@okaychat/db';
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';

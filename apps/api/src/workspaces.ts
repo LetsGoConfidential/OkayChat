@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { IsEmail, IsEnum, IsOptional, IsString, IsTimeZone, MaxLength, MinLength } from 'class-validator';
 import { Request, Response } from 'express';
-import { WorkspaceRole } from '@prisma/client';
+import { WorkspaceRole } from '@okaychat/db';
 import { createHash, randomBytes } from 'node:crypto';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';

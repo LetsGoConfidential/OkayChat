@@ -13,13 +13,15 @@ Account creation, login, workspace membership and invitations, contacts, leads, 
 
 ## Local setup
 
-Prerequisites: Node.js 20+, pnpm 11+, PostgreSQL 15+, and Redis 7+.
+Prerequisites: Node.js 20+, pnpm 11+, and Docker Desktop (or PostgreSQL 15+ and Redis 7+ installed locally).
 
-1. Copy `.env.example` to `.env` and set strong, unique secrets plus database/Redis credentials. `JWT_ACCESS_SECRET` must be present for the API to start. Set `TOKEN_ENCRYPTION_KEY` to a base64-encoded random 32-byte key (for example, generate one with Node's `crypto.randomBytes(32).toString('base64')`). Configure the Meta app secret and webhook verification token before subscribing webhooks.
-2. Install workspace dependencies from the repository root with `pnpm install`.
-3. Generate the database client with `pnpm db:generate`.
-4. Apply the committed PostgreSQL migrations locally with `pnpm db:migrate`. Production deployments should apply them with `pnpm db:deploy`; never use `migrate dev` in production.
-5. Run the web app using `pnpm dev` (http://localhost:3000). Run the API in a second terminal with `pnpm dev:api` (http://localhost:4000/api/v1/health).
+1. Copy `.env.example` to `.env`. The example uses the local credentials from `docker-compose.yml`; replace the placeholder JWT secret before sharing or deploying the environment. Set `TOKEN_ENCRYPTION_KEY` to a base64-encoded random 32-byte key before connecting WhatsApp.
+2. Start local infrastructure from the repository root with `docker compose up -d` and wait for both containers to report healthy.
+3. Install workspace dependencies with `pnpm install`, then generate the Prisma client with `pnpm db:generate`.
+4. Apply the committed PostgreSQL migrations with `pnpm db:migrate`. Production deployments should use `pnpm db:deploy`; never use `migrate dev` in production.
+5. Start the API in one terminal with `pnpm dev:api`, then start the web app with `pnpm dev` in another terminal. Confirm the API at http://localhost:4000/api/v1/health before creating an account at http://localhost:3000/login.
+
+The web sign-up page reports an explicit API-unavailable message if the API cannot be reached. If registration fails after the API is healthy, inspect the API terminal for database connection, migration, or validation errors.
 
 Run `pnpm typecheck` to check both TypeScript applications and `pnpm build` to create production builds. Prisma Client is generated into `packages/db/generated/client` and imported by the API through the `@okaychat/db` workspace package.
 

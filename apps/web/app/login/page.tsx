@@ -24,7 +24,12 @@ export default function LoginPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? 'Unable to sign in. Please try again.');
       router.replace(inviteToken ? (mode === 'register' ? '/' : `/invite/accept?token=${encodeURIComponent(inviteToken)}`) : mode === 'register' ? '/onboarding' : '/');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not reach OkayChat. Check that the API is running.'); }
+    } catch (e) {
+      const unavailable = e instanceof TypeError && /fetch/i.test(e.message);
+      setError(unavailable
+        ? 'OkayChat could not reach its API. Start PostgreSQL and Redis, then start the API at localhost:4000 and try again.'
+        : e instanceof Error ? e.message : 'Could not reach OkayChat. Check that the API is running.');
+    }
     finally { setBusy(false); }
   }
 

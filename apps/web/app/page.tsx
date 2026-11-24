@@ -16,6 +16,7 @@ import { LeadsView } from './leads-view';
 import { NotificationCenter } from './notifications-view';
 import { BillingView } from './billing-view';
 import { PlatformAdminView } from './platform-admin-view';
+import { ContactCreateDialog } from './contact-create';
 
 type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings'|'Platform Admin';
 type WorkspaceSummary = { id: string; name: string; slug: string; timezone: string; role: string };
@@ -33,6 +34,7 @@ export default function OkayChat() {
   const router = useRouter();
   const [active, setActive] = useState<Nav>('Home'); const [query, setQuery] = useState(''); const [notice, setNotice] = useState('');
   const [mobileNav, setMobileNav] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [workspaceMenu, setWorkspaceMenu] = useState(false);
+  const [contactCreateOpen, setContactCreateOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null); const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]); const [channelsConnected, setChannelsConnected] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const toast = useCallback((message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2800); }, []);
@@ -62,14 +64,7 @@ export default function OkayChat() {
     if (!response.ok) { toast('Could not create workspace'); return; }
     const result = await response.json(); setWorkspace(result.workspace); await loadWorkspaces(); setWorkspaceMenu(false); toast('Workspace created');
   };
-  const addContact = async () => {
-    const name = window.prompt('Contact name'); if (!name?.trim()) return;
-    const phone = window.prompt('Phone number in international format, e.g. +919876543210'); if (!phone?.trim()) return;
-    const response = await fetch(`${API}/contacts`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), phone: phone.trim(), source: 'Manual' }) });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) { toast(Array.isArray(result.message) ? result.message.join(', ') : result.message ?? 'Could not add contact'); return; }
-    window.dispatchEvent(new Event('okaychat:contacts-changed')); toast(`${result.name} added to contacts`);
-  };
+  const addContact = () => setContactCreateOpen(true);
   const signOut = async () => { try { await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' }); } finally { router.replace('/login'); } };
 
   return <div className="shell">
@@ -83,6 +78,7 @@ export default function OkayChat() {
     <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><div className="search-global"><Search size={15}/><input placeholder="Search anything..." value={query} onChange={event => setQuery(event.target.value)}/><kbd>⌘ K</kbd></div><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
       <div className="page-content"><WorkspacePage active={active} workspaceRole={workspace?.role ?? 'AGENT'} onNavigate={setActive} onToast={toast} onAddContact={addContact} connected={channelsConnected} onChannelsChanged={loadWorkspaces}/></div>
     </main>
+    <ContactCreateDialog open={contactCreateOpen} onClose={() => setContactCreateOpen(false)} onToast={toast}/>
     {notice && <div className="toast"><Check size={16}/>{notice}</div>}
   </div>;
 }

@@ -64,6 +64,20 @@ enum WhatsappConsent {
   OPTED_IN
   OPTED_OUT
 }
+enum BillingPlan {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+  AGENCY
+  ENTERPRISE
+}
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+}
 
 model User {
   id           String @id @default(cuid())
@@ -114,6 +128,7 @@ model Workspace {
   invites     WorkspaceInvite[]
   conversationNotes ConversationNote[]
   notifications Notification[]
+  subscription WorkspaceSubscription?
 }
 
 model Membership {
@@ -357,4 +372,21 @@ model Notification {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([workspaceId, userId, readAt, createdAt])
+}
+
+model WorkspaceSubscription {
+  id                     String @id @default(cuid())
+  workspaceId            String @unique
+  plan                   BillingPlan @default(FREE)
+  status                 SubscriptionStatus @default(ACTIVE)
+  provider               String?
+  providerCustomerId     String? @unique
+  providerSubscriptionId String? @unique
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  workspace              Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([plan, status])
 }

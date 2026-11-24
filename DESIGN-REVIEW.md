@@ -18,14 +18,14 @@ Reviewed 18 November 2026 against the current Next.js page components and API wi
 | Analytics | Workspace KPIs, seven-day inbound/outbound activity, and lead/contact source breakdown. | Persisted-data view exists. Validate metric definitions, empty states, date ranges, and export before launch. |
 | Team | Workspace member list and invite/revoke flow. Invite links are copied for manual sharing. | Core flow exists. Email delivery and verified-email proof remain. |
 | Settings | Workspace and manual WhatsApp Cloud API connection form. | Token is encrypted at rest, but setup is manual. Meta Embedded Signup and connection health/recovery UX remain. |
-| Billing | Navigation entry with a generic setup-in-progress placeholder. | Not implemented: no persisted plan, subscription, invoice, payment, or webhook workflow. |
+| Billing | Current-plan summary, workspace usage counts, plan cards, and an explicit payments-not-connected notice. | Persisted workspace subscription and plan/usage read API are implemented. Prices are proposal-stage; no checkout, invoice, payment, or subscription webhook exists. Only owners/admins see the page. |
 | Notifications | Bell opens a workspace panel with unread count, assignment notices, timestamps, mark-read, and mark-all-read actions. | Persisted in-app notification foundation is implemented for manual and automated conversation assignment. Email/push delivery and notification preferences remain. |
 | Platform Admin | No page or route in the current navigation. | Not implemented: no platform-admin role or protected admin operations. |
 
 ## Design review: changes before a customer launch
 
 1. **Make setup and errors recoverable.** Finish the local API/database setup, test registration and login end to end, and show clear connection, loading, empty, validation, and retry states throughout the workspace.
-2. **Remove unfinished affordances.** Replace the contact browser prompts, wire global search and help, and either implement Billing or label it “Coming soon” and hide it from customer plans until usable. Add real Terms and Privacy pages.
+2. **Remove unfinished affordances.** Replace the contact browser prompts, wire global search and help, and finish Billing checkout/invoice flows before selling paid plans. Add real Terms and Privacy pages.
 3. **Complete trust and safety basics.** Add verified email, rate limits, password reset/session management, CSRF review, and security review. Keep WhatsApp consent evidence and opt-out enforcement visible and auditable.
 4. **Finish WhatsApp onboarding and campaign safeguards.** Add Embedded Signup, provider status/health recovery, variable mapping and supported media/buttons, unsubscribe handling, scheduling, and provider rate limits. Exercise webhook failures and delivery retries with Meta test credentials.
 5. **Close operational readiness.** Add production monitoring/alerts, backups and restore drills, deployment configuration, privacy export/delete flows, and a production migration runbook.

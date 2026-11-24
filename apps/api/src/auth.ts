@@ -59,7 +59,7 @@ class AuthService {
     const slug = `${slugBase}-${randomBytes(3).toString('hex')}`;
     const created = await this.db.$transaction(async tx => {
       const user = await tx.user.create({ data: { email, name: dto.name.trim(), passwordHash } });
-      const workspace = await tx.workspace.create({ data: { name: workspaceName, slug } });
+      const workspace = await tx.workspace.create({ data: { name: workspaceName, slug, subscription: { create: {} } } });
       await tx.membership.create({ data: { userId: user.id, workspaceId: workspace.id, role: 'OWNER' } });
       return { user, workspace };
     });

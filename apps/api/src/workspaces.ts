@@ -184,7 +184,7 @@ class WorkspaceController {
   async create(@Body() dto: CreateWorkspaceDto, @Req() request: WorkspaceRequest, @Res({ passthrough: true }) response: Response) {
     const slugBase = dto.name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'workspace';
     const workspace = await this.db.$transaction(async tx => {
-      const created = await tx.workspace.create({ data: { name: dto.name.trim(), slug: `${slugBase}-${randomBytes(3).toString('hex')}` } });
+      const created = await tx.workspace.create({ data: { name: dto.name.trim(), slug: `${slugBase}-${randomBytes(3).toString('hex')}`, subscription: { create: {} } } });
       await tx.membership.create({ data: { workspaceId: created.id, userId: request.user.sub, role: WorkspaceRole.OWNER } });
       await tx.auditEvent.create({ data: { workspaceId: created.id, actorId: request.user.sub, action: 'WORKSPACE_CREATED', entityType: 'Workspace', entityId: created.id } });
       return created;

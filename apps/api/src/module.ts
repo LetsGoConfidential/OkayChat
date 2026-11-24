@@ -11,6 +11,7 @@ import { AutomationModule } from './automations';
 import { AnalyticsModule } from './analytics';
 import { TemplateModule } from './templates';
 import { NotificationModule } from './notifications';
+import { BillingModule } from './billing';
 
 function redisConnection(rawUrl: string | undefined) {
   const redisUrl = new URL(rawUrl || 'redis://localhost:6379');
@@ -29,5 +30,5 @@ class HealthController {
   @Get('meta') metadata() { return { product: 'OkayChat', apiVersion: 'v1', status: 'foundation' }; }
 }
 
-@Module({ imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: '../../.env' }), BullModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ connection: redisConnection(config.get<string>('REDIS_URL')) }) }), AuthModule, WorkspaceModule, CrmModule, MessagingModule, CampaignModule, AutomationModule, AnalyticsModule, TemplateModule, NotificationModule], controllers: [HealthController], providers: [{ provide: APP_PIPE, useValue: new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }) }] })
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: '../../.env' }), BullModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ connection: redisConnection(config.get<string>('REDIS_URL')) }) }), AuthModule, WorkspaceModule, CrmModule, MessagingModule, CampaignModule, AutomationModule, AnalyticsModule, TemplateModule, NotificationModule, BillingModule], controllers: [HealthController], providers: [{ provide: APP_PIPE, useValue: new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }) }] })
 export class AppModule {}

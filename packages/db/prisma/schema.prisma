@@ -92,6 +92,7 @@ model User {
   invitesCreated WorkspaceInvite[] @relation("WorkspaceInviteCreator")
   conversationNotes ConversationNote[]
   notifications Notification[]
+  platformAdminEvents PlatformAdminAuditEvent[]
 }
 
 model Session {
@@ -389,4 +390,14 @@ model WorkspaceSubscription {
   updatedAt              DateTime @updatedAt
   workspace              Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([plan, status])
+}
+
+model PlatformAdminAuditEvent {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  @@index([actorId, createdAt])
 }

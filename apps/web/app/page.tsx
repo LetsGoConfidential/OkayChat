@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, ArrowUpRight, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, Inbox, LayoutDashboard, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, Users, WalletCards, Zap } from 'lucide-react';
+import { Activity, ArrowUpRight, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, Inbox, LayoutDashboard, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, Shield, Users, WalletCards, Zap } from 'lucide-react';
 import { InboxView } from './inbox-view';
 import { CampaignsView } from './campaigns-view';
 import { AutomationsView } from './automations-view';
@@ -15,8 +15,9 @@ import { ContactImportButton } from './contact-import';
 import { LeadsView } from './leads-view';
 import { NotificationCenter } from './notifications-view';
 import { BillingView } from './billing-view';
+import { PlatformAdminView } from './platform-admin-view';
 
-type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings';
+type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings'|'Platform Admin';
 type WorkspaceSummary = { id: string; name: string; slug: string; timezone: string; role: string };
 type CrmRow = { id: string; name: string; company: string; phone: string; tags: string[]; whatsappConsent?: 'UNKNOWN' | 'OPTED_IN' | 'OPTED_OUT'; stage?: string; createdAt: string };
 type RecentConversation = { id: string; status: string; contact: { name: string; phone: string }; messages: { body: string | null; createdAt: string }[] };
@@ -25,6 +26,7 @@ const navItems: { label: Nav; icon: typeof Inbox; group: string }[] = [
   { label: 'Home', icon: LayoutDashboard, group: 'WORKSPACE' }, { label: 'Inbox', icon: Inbox, group: 'WORKSPACE' }, { label: 'Contacts', icon: Users, group: 'WORKSPACE' }, { label: 'Leads', icon: Activity, group: 'WORKSPACE' },
   { label: 'Campaigns', icon: Send, group: 'ENGAGE' }, { label: 'Templates', icon: FileText, group: 'ENGAGE' }, { label: 'Automations', icon: Zap, group: 'ENGAGE' },
   { label: 'Analytics', icon: BarChart3, group: 'MANAGE' }, { label: 'Team', icon: Users, group: 'MANAGE' }, { label: 'Billing', icon: WalletCards, group: 'MANAGE' }, { label: 'Settings', icon: Settings, group: 'MANAGE' },
+  { label: 'Platform Admin', icon: Shield, group: 'SYSTEM' },
 ];
 
 export default function OkayChat() {
@@ -32,16 +34,18 @@ export default function OkayChat() {
   const [active, setActive] = useState<Nav>('Home'); const [query, setQuery] = useState(''); const [notice, setNotice] = useState('');
   const [mobileNav, setMobileNav] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [workspaceMenu, setWorkspaceMenu] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null); const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]); const [channelsConnected, setChannelsConnected] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const toast = useCallback((message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 2800); }, []);
 
   const loadWorkspaces = useCallback(async () => {
     try {
-      const [currentResponse, listResponse, channelsResponse] = await Promise.all([
-        fetch(`${API}/workspaces/current`, { credentials: 'include' }), fetch(`${API}/workspaces`, { credentials: 'include' }), fetch(`${API}/channels`, { credentials: 'include' }),
+      const [currentResponse, listResponse, channelsResponse, authResponse] = await Promise.all([
+        fetch(`${API}/workspaces/current`, { credentials: 'include' }), fetch(`${API}/workspaces`, { credentials: 'include' }), fetch(`${API}/channels`, { credentials: 'include' }), fetch(`${API}/auth/me`, { credentials: 'include' }),
       ]);
       if (currentResponse.ok) setWorkspace(await currentResponse.json());
       if (listResponse.ok) setWorkspaces(await listResponse.json());
       if (channelsResponse.ok) { const channels = await channelsResponse.json(); setChannelsConnected(channels.some((channel: { status: string }) => channel.status === 'CONNECTED')); }
+      if (authResponse.ok) { const auth = await authResponse.json(); setIsPlatformAdmin(auth.platformAdmin === true); }
     } catch { /* Show the shell while the API is unavailable. */ }
   }, []);
   useEffect(() => { void loadWorkspaces(); }, [loadWorkspaces]);
@@ -73,7 +77,7 @@ export default function OkayChat() {
       <div className="brand"><div className="brand-icon"><MessageCircle size={18} fill="currentColor"/></div><span>okay<span className="brand-light">chat</span></span><button className="collapse" aria-label="Collapse sidebar"><ChevronLeft size={16}/></button></div>
       <button className="workspace-switch" onClick={() => setWorkspaceMenu(open => !open)}><div className="workspace-mark">{(workspace?.name ?? 'O').slice(0, 1).toUpperCase()}</div><div className="workspace-copy"><b>{workspace?.name ?? 'Loading workspace'}</b><small>{workspace?.role ? `${workspace.role.toLowerCase()} workspace` : 'Business workspace'}</small></div><ChevronDown size={15}/></button>
       {workspaceMenu && <div className="workspace-menu"><div className="workspace-menu-label">YOUR WORKSPACES</div>{workspaces.map(item => <button key={item.id} onClick={() => void activateWorkspace(item.id)}><span className="workspace-mark">{item.name.slice(0, 1).toUpperCase()}</span><span><b>{item.name}</b><small>{item.role.toLowerCase()}</small></span>{item.id === workspace?.id && <Check size={14}/>}</button>)}<button className="workspace-create" onClick={() => void createWorkspace()}><Plus size={15}/> Create workspace</button></div>}
-      {['WORKSPACE', 'ENGAGE', 'MANAGE'].map(group => <div className="nav-group" key={group}><div className="nav-label">{group}</div>{navItems.filter(item => item.group === group && !(item.label === 'Leads' && workspace?.role === 'AGENT') && !(item.label === 'Billing' && !['OWNER', 'ADMIN'].includes(workspace?.role ?? ''))).map(item => <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileNav(false); }}><item.icon size={17}/><span>{item.label}</span></button>)}</div>)}
+      {['WORKSPACE', 'ENGAGE', 'MANAGE', 'SYSTEM'].map(group => { const items = navItems.filter(item => item.group === group && !(item.label === 'Leads' && workspace?.role === 'AGENT') && !(item.label === 'Billing' && !['OWNER', 'ADMIN'].includes(workspace?.role ?? '')) && !(item.label === 'Platform Admin' && !isPlatformAdmin)); return items.length ? <div className="nav-group" key={group}><div className="nav-label">{group}</div>{items.map(item => <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileNav(false); }}><item.icon size={17}/><span>{item.label}</span></button>)}</div> : null; })}
       <div className="sidebar-bottom"><div className="whatsapp-status"><span className={`status-dot ${channelsConnected ? 'online' : ''}`}/><div><b>{channelsConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}</b><small>{channelsConnected ? 'Business account active' : 'Connect from workspace settings'}</small></div><button onClick={() => setActive('Settings')} aria-label="WhatsApp settings"><ChevronRight size={15}/></button></div><button className="profile" onClick={() => setProfileOpen(open => !open)}><div className="avatar avatar-me">OC</div><span><b>{workspace?.name ?? 'Workspace user'}</b><small>{workspace?.role ?? 'Member'}</small></span><MoreHorizontal size={18}/></button>{profileOpen && <div className="profile-menu"><button onClick={() => { setActive('Settings'); setProfileOpen(false); }}><Settings size={15}/>Workspace settings</button><button onClick={() => void signOut()}><LogOut size={15}/>Sign out</button></div>}</div>
     </aside>
     <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><div className="search-global"><Search size={15}/><input placeholder="Search anything..." value={query} onChange={event => setQuery(event.target.value)}/><kbd>⌘ K</kbd></div><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
@@ -90,6 +94,7 @@ function WorkspacePage({ active, workspaceRole, onNavigate, onToast, onAddContac
   if (active === 'Analytics') return <PageFrame group="MANAGE" title="Analytics" subtitle="See real conversation, contact, and lead activity in this workspace."><AnalyticsView/></PageFrame>;
   if (active === 'Templates') return <PageFrame group="ENGAGE" title="Templates" subtitle="Review WhatsApp message templates and approval status."><TemplatesView onToast={onToast}/></PageFrame>;
   if (active === 'Billing') return <PageFrame group="MANAGE" title="Billing" subtitle="Review your workspace plan and usage."><BillingView/></PageFrame>;
+  if (active === 'Platform Admin') return <PageFrame group="SYSTEM" title="Platform Admin" subtitle="Read-only overview across OkayChat workspaces."><PlatformAdminView/></PageFrame>;
   if (active === 'Settings') return <PageFrame group="MANAGE" title="Settings" subtitle="Connect WhatsApp and manage your workspace integrations."><SettingsView onToast={onToast} onChanged={() => { window.dispatchEvent(new Event('okaychat:contacts-changed')); onChannelsChanged(); }}/></PageFrame>;
   if (active === 'Team') return <PageFrame group="MANAGE" title="Team" subtitle="Invite the people who keep customer conversations moving."><TeamView role={workspaceRole} onToast={onToast}/></PageFrame>;
   if (active === 'Leads') return <PageFrame group="WORKSPACE" title="Leads" subtitle="Move every opportunity forward with a clear sales pipeline."><LeadsView role={workspaceRole} onToast={onToast}/></PageFrame>;

@@ -1,6 +1,6 @@
 # OkayChat V1 page and launch review
 
-Reviewed 18 November 2026 against the current Next.js page components and API wiring. The local browser can currently show the sign-up/sign-in page. The other workspace pages are behind authentication, and their live data could not be inspected because the API, PostgreSQL, and Redis are not running in this environment.
+Reviewed 24 November 2026 against the current Next.js page components and API wiring. The local browser can show the sign-up/sign-in page. The other workspace pages are behind authentication, and their live data could not be inspected because the API, PostgreSQL, and Redis are not running in this environment. They have been reviewed from their source components and styles, not visually verified with live workspace data.
 
 ## What each page is for
 
@@ -20,7 +20,7 @@ Reviewed 18 November 2026 against the current Next.js page components and API wi
 | Settings | Workspace and manual WhatsApp Cloud API connection form. | Token is encrypted at rest, but setup is manual. Meta Embedded Signup and connection health/recovery UX remain. |
 | Billing | Current-plan summary, workspace usage counts, plan cards, and an explicit payments-not-connected notice. | Persisted workspace subscription and plan/usage read API are implemented. Prices are proposal-stage; no checkout, invoice, payment, or subscription webhook exists. Only owners/admins see the page. |
 | Notifications | Bell opens a workspace panel with unread count, assignment notices, timestamps, mark-read, and mark-all-read actions. | Persisted in-app notification foundation is implemented for manual and automated conversation assignment. Email/push delivery and notification preferences remain. |
-| Platform Admin | No page or route in the current navigation. | Not implemented: no platform-admin role or protected admin operations. |
+| Platform Admin | Read-only summary cards and a recent-workspaces table, kept in a SYSTEM navigation group. | Protected overview API requires an explicit `PLATFORM_ADMIN_EMAILS` allowlist, omits member email addresses, and audits every overview access. No global edit, impersonation, or tenant-data access actions are provided. |
 
 ## Design review: changes before a customer launch
 

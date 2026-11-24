@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from './database';
+import { isPlatformAdminEmail } from './platform-admin-access';
 
 class RegisterDto {
   @IsString() @IsNotEmpty() name!: string;
@@ -146,7 +147,7 @@ class AuthController {
   @Get('me') @UseGuards(AccessGuard) async me(@Req() req: Request & { user: any }) {
     const membership = await this.db.membership.findFirst({ where: { userId: req.user.sub, workspaceId: req.user.workspaceId }, include: { user: true, workspace: true } });
     if (!membership) throw new UnauthorizedException();
-    return { user: { id: membership.user.id, name: membership.user.name, email: membership.user.email }, workspace: { id: membership.workspace.id, name: membership.workspace.name, slug: membership.workspace.slug }, role: membership.role };
+    return { user: { id: membership.user.id, name: membership.user.name, email: membership.user.email }, workspace: { id: membership.workspace.id, name: membership.workspace.name, slug: membership.workspace.slug }, role: membership.role, platformAdmin: isPlatformAdminEmail(membership.user.email) };
   }
 }
 

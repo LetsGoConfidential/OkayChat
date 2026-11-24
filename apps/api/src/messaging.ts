@@ -142,13 +142,22 @@ class MessagingService {
   }
 
   async updateConversation(workspaceId: string, actorId: string, id: string, dto: ConversationUpdateDto) {
-    const existing = await this.db.conversation.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    const existing = await this.db.conversation.findFirst({ where: { id, workspaceId }, select: { id: true, assignedTo: true } });
     if (!existing) throw new NotFoundException('Conversation not found');
     if (!dto.status && dto.assignedTo === undefined) throw new BadRequestException('Provide a status or assignee to update');
     if (dto.assignedTo && !(await this.db.membership.findUnique({ where: { workspaceId_userId: { workspaceId, userId: dto.assignedTo } }, select: { id: true } }))) throw new BadRequestException('Assignee must be a member of this workspace');
     const conversation = await this.db.$transaction(async tx => {
       const conversation = await tx.conversation.update({ where: { id }, data: dto, include: { contact: true } });
       await tx.auditEvent.create({ data: { workspaceId, actorId, action: 'CONVERSATION_UPDATED', entityType: 'Conversation', entityId: id, metadata: { status: dto.status ?? null, assignedTo: dto.assignedTo ?? null } } });
+      if (dto.assignedTo && dto.assignedTo !== existing.assignedTo && dto.assignedTo !== actorId) {
+        await tx.notification.create({ data: {
+          workspaceId,
+          userId: dto.assignedTo,
+          type: 'CONVERSATION_ASSIGNED',
+          title: 'Conversation assigned to you',
+          body: `${conversation.contact.name} is waiting in your inbox.`,
+        } });
+      }
       return conversation;
     });
     await this.realtime.publish(workspaceId, { type: 'inbox.changed', conversationId: id });
@@ -328,9 +337,17 @@ class MessagingService {
       if (trigger?.type !== 'INBOUND_WHATSAPP_MESSAGE' || !Array.isArray(actions)) continue;
       for (const action of actions) {
         if (action?.type !== 'ASSIGN_CONVERSATION' || !action.userId) continue;
-        const assigned = await this.db.conversation.updateMany({ where: { id: conversationId, workspaceId, assignedTo: null }, data: { assignedTo: action.userId } });
-        if (assigned.count) {
-          await this.db.auditEvent.create({ data: { workspaceId, action: 'CONVERSATION_AUTO_ASSIGNED', entityType: 'Conversation', entityId: conversationId, metadata: { automationId: rule.id, assigneeId: action.userId } } });
+        const member = await this.db.membership.findUnique({ where: { workspaceId_userId: { workspaceId, userId: action.userId } }, select: { userId: true } });
+        if (!member) continue;
+        const assignedCount = await this.db.$transaction(async tx => {
+          const assigned = await tx.conversation.updateMany({ where: { id: conversationId, workspaceId, assignedTo: null }, data: { assignedTo: action.userId } });
+          if (!assigned.count) return 0;
+          const conversation = await tx.conversation.findFirst({ where: { id: conversationId, workspaceId }, select: { contact: { select: { name: true } } } });
+          await tx.notification.create({ data: { workspaceId, userId: action.userId!, type: 'CONVERSATION_ASSIGNED', title: 'New conversation assigned', body: `${conversation?.contact.name ?? 'A customer'} is waiting in your inbox.` } });
+          await tx.auditEvent.create({ data: { workspaceId, action: 'CONVERSATION_AUTO_ASSIGNED', entityType: 'Conversation', entityId: conversationId, metadata: { automationId: rule.id, assigneeId: action.userId } } });
+          return 1;
+        });
+        if (assignedCount) {
           return;
         }
       }

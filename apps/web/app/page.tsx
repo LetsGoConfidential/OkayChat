@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, ArrowUpRight, BarChart3, Bell, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, Inbox, LayoutDashboard, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, Users, WalletCards, Zap } from 'lucide-react';
+import { Activity, ArrowUpRight, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, Inbox, LayoutDashboard, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Search, Send, Settings, Users, WalletCards, Zap } from 'lucide-react';
 import { InboxView } from './inbox-view';
 import { CampaignsView } from './campaigns-view';
 import { AutomationsView } from './automations-view';
@@ -13,6 +13,7 @@ import { SettingsView } from './settings-view';
 import { TeamView } from './team-view';
 import { ContactImportButton } from './contact-import';
 import { LeadsView } from './leads-view';
+import { NotificationCenter } from './notifications-view';
 
 type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings';
 type WorkspaceSummary = { id: string; name: string; slug: string; timezone: string; role: string };
@@ -74,7 +75,7 @@ export default function OkayChat() {
       {['WORKSPACE', 'ENGAGE', 'MANAGE'].map(group => <div className="nav-group" key={group}><div className="nav-label">{group}</div>{navItems.filter(item => item.group === group && !(item.label === 'Leads' && workspace?.role === 'AGENT')).map(item => <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileNav(false); }}><item.icon size={17}/><span>{item.label}</span></button>)}</div>)}
       <div className="sidebar-bottom"><div className="whatsapp-status"><span className={`status-dot ${channelsConnected ? 'online' : ''}`}/><div><b>{channelsConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}</b><small>{channelsConnected ? 'Business account active' : 'Connect from workspace settings'}</small></div><button onClick={() => setActive('Settings')} aria-label="WhatsApp settings"><ChevronRight size={15}/></button></div><button className="profile" onClick={() => setProfileOpen(open => !open)}><div className="avatar avatar-me">OC</div><span><b>{workspace?.name ?? 'Workspace user'}</b><small>{workspace?.role ?? 'Member'}</small></span><MoreHorizontal size={18}/></button>{profileOpen && <div className="profile-menu"><button onClick={() => { setActive('Settings'); setProfileOpen(false); }}><Settings size={15}/>Workspace settings</button><button onClick={() => void signOut()}><LogOut size={15}/>Sign out</button></div>}</div>
     </aside>
-    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><div className="search-global"><Search size={15}/><input placeholder="Search anything..." value={query} onChange={event => setQuery(event.target.value)}/><kbd>⌘ K</kbd></div><button className="icon-button" onClick={() => toast('You’re all caught up')} aria-label="Notifications"><Bell size={18}/></button><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
+    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><div className="search-global"><Search size={15}/><input placeholder="Search anything..." value={query} onChange={event => setQuery(event.target.value)}/><kbd>⌘ K</kbd></div><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
       <div className="page-content"><WorkspacePage active={active} workspaceRole={workspace?.role ?? 'AGENT'} onNavigate={setActive} onToast={toast} onAddContact={addContact} connected={channelsConnected} onChannelsChanged={loadWorkspaces}/></div>
     </main>
     {notice && <div className="toast"><Check size={16}/>{notice}</div>}

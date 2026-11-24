@@ -49,6 +49,7 @@ Base path: `/api/v1`.
 - `GET/POST /webhooks/meta` — Meta verification handshake and signed webhook receiver.
 - `GET /analytics/overview` — workspace counts, seven-day message activity, and contact sources.
 - `GET /realtime/events` — authenticated Server-Sent Events stream for the active workspace; events contain change notifications, not message contents.
+- `GET /notifications`, `PATCH /notifications/:id/read`, `POST /notifications/read-all` — authenticated, workspace- and user-scoped in-app notifications for conversation assignments.
 - `GET /templates`, `POST /templates/sync/:channelId` (owner/admin) — list locally synced templates and sync their status/components from Meta.
 - `POST /conversations/:id/template` — send a synced, approved template with text body parameters and an idempotency key; freeform sends remain subject to the customer service window.
 

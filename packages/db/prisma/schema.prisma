@@ -77,6 +77,7 @@ model User {
   outboxJobs   OutboundOutbox[]
   invitesCreated WorkspaceInvite[] @relation("WorkspaceInviteCreator")
   conversationNotes ConversationNote[]
+  notifications Notification[]
 }
 
 model Session {
@@ -112,6 +113,7 @@ model Workspace {
   outboxJobs  OutboundOutbox[]
   invites     WorkspaceInvite[]
   conversationNotes ConversationNote[]
+  notifications Notification[]
 }
 
 model Membership {
@@ -341,4 +343,18 @@ model AuditEvent {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
   @@index([workspaceId, createdAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  type        String
+  title       String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, userId, readAt, createdAt])
 }

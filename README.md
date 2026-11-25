@@ -55,6 +55,7 @@ Base path: `/api/v1`.
 - `GET /templates`, `POST /templates/sync/:channelId` (owner/admin) — list locally synced templates and sync their status/components from Meta.
 - `GET /billing/current` (owner/admin) — current workspace plan, membership/contact/campaign counts, and the proposal-stage plan catalog.
 - `GET /platform-admin/overview` — read-only global usage and recent workspace summary; requires a signed-in account whose email is listed in `PLATFORM_ADMIN_EMAILS`. Each access is audit logged.
+- `GET /search?q=...` — authenticated, active-workspace search across contacts, leads, and conversations; returns a small result set for each category and requires at least two characters.
 - `POST /conversations/:id/template` — send a synced, approved template with text body parameters and an idempotency key; freeform sends remain subject to the customer service window.
 
 Registration requires `name`, `email`, and `password` (10+ characters), plus `workspaceName` for new workspaces. With an `inviteToken`, registration atomically creates the user and the invited workspace membership instead. Login accepts `email` and `password`. Access and rotating refresh credentials are issued as HttpOnly cookies; refresh tokens are stored only as SHA-256 hashes and revoked on rotation/logout. The web app checks `/auth/me` on protected routes and attempts one session refresh before returning to sign-in.

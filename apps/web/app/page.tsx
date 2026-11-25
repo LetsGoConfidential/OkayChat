@@ -17,6 +17,7 @@ import { NotificationCenter } from './notifications-view';
 import { BillingView } from './billing-view';
 import { PlatformAdminView } from './platform-admin-view';
 import { ContactCreateDialog } from './contact-create';
+import { GlobalSearch, type GlobalSearchResult } from './global-search';
 
 type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings'|'Platform Admin';
 type WorkspaceSummary = { id: string; name: string; slug: string; timezone: string; role: string };
@@ -32,7 +33,8 @@ const navItems: { label: Nav; icon: typeof Inbox; group: string }[] = [
 
 export default function OkayChat() {
   const router = useRouter();
-  const [active, setActive] = useState<Nav>('Home'); const [query, setQuery] = useState(''); const [notice, setNotice] = useState('');
+  const [active, setActive] = useState<Nav>('Home'); const [notice, setNotice] = useState('');
+  const [initialCrmQuery, setInitialCrmQuery] = useState(''); const [inboxTarget, setInboxTarget] = useState<{id:string;status:string;query:string}|null>(null);
   const [mobileNav, setMobileNav] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [workspaceMenu, setWorkspaceMenu] = useState(false);
   const [contactCreateOpen, setContactCreateOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null); const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]); const [channelsConnected, setChannelsConnected] = useState(false);
@@ -65,6 +67,10 @@ export default function OkayChat() {
     const result = await response.json(); setWorkspace(result.workspace); await loadWorkspaces(); setWorkspaceMenu(false); toast('Workspace created');
   };
   const addContact = () => setContactCreateOpen(true);
+  const selectSearchResult = (result: GlobalSearchResult, searchQuery: string) => {
+    if (result.kind === 'conversation') { setInboxTarget({ id: result.id, status: result.status ?? 'OPEN', query: searchQuery }); setActive('Inbox'); return; }
+    setInitialCrmQuery(searchQuery); setActive(result.kind === 'contact' ? 'Contacts' : 'Leads');
+  };
   const signOut = async () => { try { await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' }); } finally { router.replace('/login'); } };
 
   return <div className="shell">
@@ -75,16 +81,16 @@ export default function OkayChat() {
       {['WORKSPACE', 'ENGAGE', 'MANAGE', 'SYSTEM'].map(group => { const items = navItems.filter(item => item.group === group && !(item.label === 'Leads' && workspace?.role === 'AGENT') && !(item.label === 'Billing' && !['OWNER', 'ADMIN'].includes(workspace?.role ?? '')) && !(item.label === 'Platform Admin' && !isPlatformAdmin)); return items.length ? <div className="nav-group" key={group}><div className="nav-label">{group}</div>{items.map(item => <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileNav(false); }}><item.icon size={17}/><span>{item.label}</span></button>)}</div> : null; })}
       <div className="sidebar-bottom"><div className="whatsapp-status"><span className={`status-dot ${channelsConnected ? 'online' : ''}`}/><div><b>{channelsConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}</b><small>{channelsConnected ? 'Business account active' : 'Connect from workspace settings'}</small></div><button onClick={() => setActive('Settings')} aria-label="WhatsApp settings"><ChevronRight size={15}/></button></div><button className="profile" onClick={() => setProfileOpen(open => !open)}><div className="avatar avatar-me">OC</div><span><b>{workspace?.name ?? 'Workspace user'}</b><small>{workspace?.role ?? 'Member'}</small></span><MoreHorizontal size={18}/></button>{profileOpen && <div className="profile-menu"><button onClick={() => { setActive('Settings'); setProfileOpen(false); }}><Settings size={15}/>Workspace settings</button><button onClick={() => void signOut()}><LogOut size={15}/>Sign out</button></div>}</div>
     </aside>
-    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><div className="search-global"><Search size={15}/><input placeholder="Search anything..." value={query} onChange={event => setQuery(event.target.value)}/><kbd>⌘ K</kbd></div><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
-      <div className="page-content"><WorkspacePage active={active} workspaceRole={workspace?.role ?? 'AGENT'} onNavigate={setActive} onToast={toast} onAddContact={addContact} connected={channelsConnected} onChannelsChanged={loadWorkspaces}/></div>
+    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><GlobalSearch onSelect={selectSearchResult}/><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
+      <div className="page-content"><WorkspacePage active={active} workspaceRole={workspace?.role ?? 'AGENT'} onNavigate={setActive} onToast={toast} onAddContact={addContact} connected={channelsConnected} onChannelsChanged={loadWorkspaces} initialCrmQuery={initialCrmQuery} inboxTarget={inboxTarget}/></div>
     </main>
     <ContactCreateDialog open={contactCreateOpen} onClose={() => setContactCreateOpen(false)} onToast={toast}/>
     {notice && <div className="toast"><Check size={16}/>{notice}</div>}
   </div>;
 }
 
-function WorkspacePage({ active, workspaceRole, onNavigate, onToast, onAddContact, connected, onChannelsChanged }: { active: Nav; workspaceRole: string; onNavigate: (nav: Nav) => void; onToast: (message: string) => void; onAddContact: () => void; connected: boolean; onChannelsChanged: () => void }) {
-  if (active === 'Inbox') return <InboxView onToast={onToast}/>;
+function WorkspacePage({ active, workspaceRole, onNavigate, onToast, onAddContact, connected, onChannelsChanged, initialCrmQuery, inboxTarget }: { active: Nav; workspaceRole: string; onNavigate: (nav: Nav) => void; onToast: (message: string) => void; onAddContact: () => void; connected: boolean; onChannelsChanged: () => void; initialCrmQuery: string; inboxTarget: {id:string;status:string;query:string}|null }) {
+  if (active === 'Inbox') return <InboxView onToast={onToast} initialConversationId={inboxTarget?.id} initialStatus={inboxTarget?.status} initialSearch={inboxTarget?.query}/>;
   if (active === 'Campaigns') return <PageFrame group="ENGAGE" title="Campaigns" subtitle="Plan thoughtful WhatsApp messages for your customers."><CampaignsView onToast={onToast}/></PageFrame>;
   if (active === 'Automations') return <PageFrame group="ENGAGE" title="Automations" subtitle="Set a clear next step for every new customer enquiry."><AutomationsView onToast={onToast}/></PageFrame>;
   if (active === 'Analytics') return <PageFrame group="MANAGE" title="Analytics" subtitle="See real conversation, contact, and lead activity in this workspace."><AnalyticsView/></PageFrame>;
@@ -93,8 +99,8 @@ function WorkspacePage({ active, workspaceRole, onNavigate, onToast, onAddContac
   if (active === 'Platform Admin') return <PageFrame group="SYSTEM" title="Platform Admin" subtitle="Read-only overview across OkayChat workspaces."><PlatformAdminView/></PageFrame>;
   if (active === 'Settings') return <PageFrame group="MANAGE" title="Settings" subtitle="Connect WhatsApp and manage your workspace integrations."><SettingsView onToast={onToast} onChanged={() => { window.dispatchEvent(new Event('okaychat:contacts-changed')); onChannelsChanged(); }}/></PageFrame>;
   if (active === 'Team') return <PageFrame group="MANAGE" title="Team" subtitle="Invite the people who keep customer conversations moving."><TeamView role={workspaceRole} onToast={onToast}/></PageFrame>;
-  if (active === 'Leads') return <PageFrame group="WORKSPACE" title="Leads" subtitle="Move every opportunity forward with a clear sales pipeline."><LeadsView role={workspaceRole} onToast={onToast}/></PageFrame>;
-  if (active === 'Contacts') return <CrmPage active="Contacts" role={workspaceRole} onToast={onToast} onAddContact={onAddContact}/>;
+  if (active === 'Leads') return <PageFrame group="WORKSPACE" title="Leads" subtitle="Move every opportunity forward with a clear sales pipeline."><LeadsView role={workspaceRole} onToast={onToast} initialQuery={initialCrmQuery}/></PageFrame>;
+  if (active === 'Contacts') return <CrmPage active="Contacts" role={workspaceRole} onToast={onToast} onAddContact={onAddContact} initialQuery={initialCrmQuery}/>;
   if (active === 'Home') return <HomePage connected={connected} onNavigate={onNavigate}/>;
   return <PageFrame group="MANAGE" title={active} subtitle={pageSubtitle(active)}><div className="module-card"><div className="module-empty"><div className="empty-icon"><Settings size={22}/></div><h2>{active} setup is in progress</h2><p>This area will be connected to your workspace data as the OkayChat V1 foundation is completed.</p><div className="feature-row"><span><Check size={13}/>Workspace-scoped</span><span><Check size={13}/>Built for your team</span></div></div></div></PageFrame>;
 }
@@ -114,8 +120,9 @@ function HomePage({ connected, onNavigate }: { connected: boolean; onNavigate: (
   </div>;
 }
 
-function CrmPage({ active, role, onToast, onAddContact }: { active: 'Contacts' | 'Leads'; role: string; onToast: (message: string) => void; onAddContact: () => void }) {
-  const [rows, setRows] = useState<CrmRow[]>([]); const [search, setSearch] = useState(''); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [refresh, setRefresh] = useState(0);
+function CrmPage({ active, role, onToast, onAddContact, initialQuery }: { active: 'Contacts' | 'Leads'; role: string; onToast: (message: string) => void; onAddContact: () => void; initialQuery: string }) {
+  const [rows, setRows] = useState<CrmRow[]>([]); const [search, setSearch] = useState(initialQuery); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [refresh, setRefresh] = useState(0);
+  useEffect(() => { setSearch(initialQuery); }, [initialQuery]);
   useEffect(() => { const changed = () => setRefresh(value => value + 1); window.addEventListener('okaychat:contacts-changed', changed); return () => window.removeEventListener('okaychat:contacts-changed', changed); }, []);
   useEffect(() => { const controller = new AbortController(); setLoading(true); setError(''); const params = new URLSearchParams({ limit: '100' }); if (search.trim()) params.set('q', search.trim()); fetch(`${API}/${active.toLowerCase()}?${params}`, { credentials: 'include', signal: controller.signal }).then(async response => { if (!response.ok) throw new Error('Could not load workspace records'); return response.json(); }).then(data => { const mapped = (data.items ?? []).map((item: any) => { const contact = active === 'Leads' ? item.contact : item; return { id: item.id, name: contact.name, company: active === 'Leads' ? item.title : (item.company || '—'), phone: contact.phone, tags: item.tags ?? [], whatsappConsent: contact.whatsappConsent ?? 'UNKNOWN', stage: active === 'Leads' ? item.stage : undefined, createdAt: active === 'Leads' ? item.updatedAt : item.createdAt }; }); setRows(mapped); }).catch(cause => { if (cause.name !== 'AbortError') setError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [active, search, refresh]);
   const advance = async (row: CrmRow) => { const stages = ['NEW', 'CONTACTED', 'QUALIFIED', 'SITE_VISIT', 'PROPOSAL', 'WON', 'LOST']; const next = stages[(stages.indexOf(row.stage ?? 'NEW') + 1) % stages.length]; const response = await fetch(`${API}/leads/${row.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: next }) }); if (!response.ok) { onToast('Could not update lead stage'); return; } setRows(current => current.map(item => item.id === row.id ? { ...item, stage: next } : item)); };

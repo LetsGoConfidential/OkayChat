@@ -14,10 +14,10 @@ type Lead = { id: string; title: string; stage: Stage; value: string | number | 
 const stageLabel = (stage: Stage) => stage.replaceAll('_', ' ');
 const currency = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
 
-export function LeadsView({ role, onToast }: { role: string; onToast: (message: string) => void }) {
+export function LeadsView({ role, onToast, initialQuery = '' }: { role: string; onToast: (message: string) => void; initialQuery?: string }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -31,6 +31,8 @@ export function LeadsView({ role, onToast }: { role: string; onToast: (message: 
   const [value, setValue] = useState('');
   const [createError, setCreateError] = useState('');
   const canManage = ['OWNER', 'ADMIN', 'MANAGER'].includes(role);
+
+  useEffect(() => { setQuery(initialQuery); }, [initialQuery]);
 
   const loadPage = useCallback(async (search: string, nextCursor?: string | null, append = false) => {
     if (append) setLoadingMore(true); else setLoading(true);

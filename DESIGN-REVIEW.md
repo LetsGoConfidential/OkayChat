@@ -22,11 +22,12 @@ Reviewed 25 November 2026 against the current Next.js page components and API wi
 | Notifications | Bell opens a workspace panel with unread count, assignment notices, timestamps, mark-read, and mark-all-read actions. | Persisted in-app notification foundation is implemented for manual and automated conversation assignment. Email/push delivery and notification preferences remain. |
 | Platform Admin | Read-only summary cards and a recent-workspaces table, kept in a SYSTEM navigation group. | Protected overview API requires an explicit `PLATFORM_ADMIN_EMAILS` allowlist, omits member email addresses, and audits every overview access. No global edit, impersonation, or tenant-data access actions are provided. |
 | Global search | Keyboard-accessible search across contacts, leads, and conversations, grouped by record type. | Active-workspace API search and navigation into matching records are implemented. Verify with live workspace data and keyboard/small-screen review. |
+| Help centre | Responsive in-app panel with searchable setup, WhatsApp, Inbox, team, consent, campaign, and billing guides. | Help button opens a keyboard-dismissible panel with direct workspace shortcuts. Content is static guidance; support tickets and external documentation are not connected. |
 
 ## Design review: changes before a customer launch
 
 1. **Make setup and errors recoverable.** Finish the local API/database setup, test registration and login end to end, and show clear connection, loading, empty, validation, and retry states throughout the workspace.
-2. **Remove unfinished affordances.** Wire the Help centre, and finish Billing checkout/invoice flows before selling paid plans. Add real Terms and Privacy pages.
+2. **Remove unfinished affordances.** Finish Billing checkout/invoice flows before selling paid plans. Add real Terms and Privacy pages.
 3. **Complete trust and safety basics.** Add verified email, rate limits, password reset/session management, CSRF review, and security review. Keep WhatsApp consent evidence and opt-out enforcement visible and auditable.
 4. **Finish WhatsApp onboarding and campaign safeguards.** Add Embedded Signup, provider status/health recovery, variable mapping and supported media/buttons, unsubscribe handling, scheduling, and provider rate limits. Exercise webhook failures and delivery retries with Meta test credentials.
 5. **Close operational readiness.** Add production monitoring/alerts, backups and restore drills, deployment configuration, privacy export/delete flows, and a production migration runbook.

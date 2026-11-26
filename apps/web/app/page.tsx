@@ -18,6 +18,7 @@ import { BillingView } from './billing-view';
 import { PlatformAdminView } from './platform-admin-view';
 import { ContactCreateDialog } from './contact-create';
 import { GlobalSearch, type GlobalSearchResult } from './global-search';
+import { HelpCenter } from './help-center';
 
 type Nav = 'Home'|'Inbox'|'Contacts'|'Leads'|'Campaigns'|'Templates'|'Automations'|'Analytics'|'Team'|'Billing'|'Settings'|'Platform Admin';
 type WorkspaceSummary = { id: string; name: string; slug: string; timezone: string; role: string };
@@ -35,7 +36,7 @@ export default function OkayChat() {
   const router = useRouter();
   const [active, setActive] = useState<Nav>('Home'); const [notice, setNotice] = useState('');
   const [initialCrmQuery, setInitialCrmQuery] = useState(''); const [inboxTarget, setInboxTarget] = useState<{id:string;status:string;query:string}|null>(null);
-  const [mobileNav, setMobileNav] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [workspaceMenu, setWorkspaceMenu] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [workspaceMenu, setWorkspaceMenu] = useState(false); const [helpOpen, setHelpOpen] = useState(false);
   const [contactCreateOpen, setContactCreateOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null); const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]); const [channelsConnected, setChannelsConnected] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -81,10 +82,11 @@ export default function OkayChat() {
       {['WORKSPACE', 'ENGAGE', 'MANAGE', 'SYSTEM'].map(group => { const items = navItems.filter(item => item.group === group && !(item.label === 'Leads' && workspace?.role === 'AGENT') && !(item.label === 'Billing' && !['OWNER', 'ADMIN'].includes(workspace?.role ?? '')) && !(item.label === 'Platform Admin' && !isPlatformAdmin)); return items.length ? <div className="nav-group" key={group}><div className="nav-label">{group}</div>{items.map(item => <button key={item.label} className={`nav-item ${active === item.label ? 'active' : ''}`} onClick={() => { setActive(item.label); setMobileNav(false); }}><item.icon size={17}/><span>{item.label}</span></button>)}</div> : null; })}
       <div className="sidebar-bottom"><div className="whatsapp-status"><span className={`status-dot ${channelsConnected ? 'online' : ''}`}/><div><b>{channelsConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}</b><small>{channelsConnected ? 'Business account active' : 'Connect from workspace settings'}</small></div><button onClick={() => setActive('Settings')} aria-label="WhatsApp settings"><ChevronRight size={15}/></button></div><button className="profile" onClick={() => setProfileOpen(open => !open)}><div className="avatar avatar-me">OC</div><span><b>{workspace?.name ?? 'Workspace user'}</b><small>{workspace?.role ?? 'Member'}</small></span><MoreHorizontal size={18}/></button>{profileOpen && <div className="profile-menu"><button onClick={() => { setActive('Settings'); setProfileOpen(false); }}><Settings size={15}/>Workspace settings</button><button onClick={() => void signOut()}><LogOut size={15}/>Sign out</button></div>}</div>
     </aside>
-    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><GlobalSearch onSelect={selectSearchResult}/><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => toast('Help centre is coming soon')} aria-label="Help"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
+    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(open => !open)} aria-label="Toggle navigation"><Menu size={19}/></button><div className="breadcrumbs"><span>{workspace?.name ?? 'OkayChat'}</span><ChevronRight size={14}/><b>{active}</b></div><div className="top-actions"><GlobalSearch onSelect={selectSearchResult}/><NotificationCenter onOpenInbox={() => setActive('Inbox')}/><button className="help-button" onClick={() => setHelpOpen(true)} aria-label="Open help centre" aria-haspopup="dialog"><CircleHelp size={18}/></button><div className="top-avatar">OC</div></div></header>
       <div className="page-content"><WorkspacePage active={active} workspaceRole={workspace?.role ?? 'AGENT'} onNavigate={setActive} onToast={toast} onAddContact={addContact} connected={channelsConnected} onChannelsChanged={loadWorkspaces} initialCrmQuery={initialCrmQuery} inboxTarget={inboxTarget}/></div>
     </main>
     <ContactCreateDialog open={contactCreateOpen} onClose={() => setContactCreateOpen(false)} onToast={toast}/>
+    {helpOpen && <HelpCenter onClose={() => setHelpOpen(false)} onNavigate={setActive}/>}
     {notice && <div className="toast"><Check size={16}/>{notice}</div>}
   </div>;
 }

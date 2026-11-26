@@ -27,6 +27,10 @@ The web sign-up page reports an explicit API-unavailable message if the API cann
 
 Run `pnpm typecheck` to check both TypeScript applications and `pnpm build` to create production builds. Prisma Client is generated into `packages/db/generated/client` and imported by the API through the `@okaychat/db` workspace package.
 
+Run the API unit tests from `apps/api` with `pnpm test` (Node.js 22.6 or newer). The current suite covers search query validation; API/database and WhatsApp integration tests still require running services and credentials.
+
+If a file-sync provider manages `.next` as a cloud placeholder and Next.js reports a reparse-point error, set `NEXT_DIST_DIR=.next-local-build` for the web build. This keeps generated output separate from the managed `.next` directory.
+
 ## Architecture and tenant safety
 
 Every business-owned record carries `workspaceId` directly or is reached through a parent with a workspace relationship. The API must derive the active workspace from an authenticated membership, never trust a client-supplied workspace ID alone, and scope every read/write to that membership. Use database row-level security as defense in depth before production. Owners/admins manage workspace and billing; managers operate leads/campaigns/analytics; agents work assigned conversations. Add authorization guards per endpoint and immutable audit events for sensitive changes.

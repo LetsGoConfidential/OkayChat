@@ -2,6 +2,7 @@ import { BadRequestException, Controller, Get, Module, Query, Req, UseGuards } f
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';
+import { searchQueryValidationError } from './search-query';
 import { WorkspaceGuard, WorkspaceModule } from './workspaces';
 
 type SearchRequest = Request & { user: { workspaceId: string } };
@@ -13,9 +14,9 @@ class SearchController {
 
   @Get()
   async search(@Req() request: SearchRequest, @Query('q') rawQuery?: string) {
-    const q = rawQuery?.trim();
-    if (!q || q.length < 2) throw new BadRequestException('Enter at least two characters to search');
-    if (q.length > 100) throw new BadRequestException('Search text must be 100 characters or fewer');
+    const q = rawQuery?.trim() ?? '';
+    const validationError = searchQueryValidationError(rawQuery);
+    if (validationError) throw new BadRequestException(validationError);
     const workspaceId = request.user.workspaceId;
     const contains = { contains: q, mode: 'insensitive' as const };
     const [contacts, leads, conversations] = await Promise.all([

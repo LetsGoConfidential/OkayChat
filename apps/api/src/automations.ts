@@ -4,11 +4,12 @@ import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-val
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';
+import { TrimInput } from './input-normalization';
 import { WorkspaceGuard, WorkspaceModule, WorkspaceRoles, WorkspaceRolesGuard } from './workspaces';
 
 type TenantRequest = Request & { user: { sub: string; workspaceId: string } };
 class AutomationCreateDto {
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @TrimInput() @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsString() @MinLength(1) @MaxLength(40) assigneeId!: string;
 }
 class AutomationUpdateDto { @IsOptional() @IsBoolean() enabled?: boolean; }

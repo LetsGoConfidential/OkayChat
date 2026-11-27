@@ -5,22 +5,23 @@ import { LeadStage, WhatsappConsent, WorkspaceRole } from '@okaychat/db';
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';
+import { TrimInput } from './input-normalization';
 import { WorkspaceGuard, WorkspaceModule, WorkspaceRoles, WorkspaceRolesGuard } from './workspaces';
 
 type TenantRequest = Request & { user: { sub: string; workspaceId: string } };
 
 class ContactCreateDto {
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @TrimInput() @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsString() @Matches(/^\+[1-9]\d{7,14}$/, { message: 'Phone must use international format, such as +14155552671' }) phone!: string;
-  @IsOptional() @IsEmail() @MaxLength(254) email?: string;
+  @IsOptional() @TrimInput() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(160) company?: string;
   @IsOptional() @IsString() @MaxLength(80) source?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) tags?: string[];
 }
 class ContactUpdateDto {
-  @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
+  @IsOptional() @TrimInput() @IsString() @MinLength(1) @MaxLength(120) name?: string;
   @IsOptional() @IsString() @Matches(/^\+[1-9]\d{7,14}$/) phone?: string;
-  @IsOptional() @IsEmail() @MaxLength(254) email?: string;
+  @IsOptional() @TrimInput() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(160) company?: string;
   @IsOptional() @IsString() @MaxLength(80) source?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) tags?: string[];
@@ -37,12 +38,12 @@ class ListQueryDto {
 }
 class LeadCreateDto {
   @IsString() @MinLength(1) @MaxLength(40) contactId!: string;
-  @IsString() @MinLength(1) @MaxLength(160) title!: string;
+  @TrimInput() @IsString() @MinLength(1) @MaxLength(160) title!: string;
   @IsOptional() @IsEnum(LeadStage) stage?: LeadStage;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) value?: number;
 }
 class LeadUpdateDto {
-  @IsOptional() @IsString() @MinLength(1) @MaxLength(160) title?: string;
+  @IsOptional() @TrimInput() @IsString() @MinLength(1) @MaxLength(160) title?: string;
   @IsOptional() @IsEnum(LeadStage) stage?: LeadStage;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) value?: number;
 }

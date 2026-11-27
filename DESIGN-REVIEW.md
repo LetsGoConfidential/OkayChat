@@ -1,6 +1,6 @@
 # OkayChat V1 page and launch review
 
-Reviewed 26 November 2026 against the current Next.js page components and API wiring. The web production build succeeds using an alternate output directory for this OneDrive-managed checkout; `/login` returned HTTP 200 from the local dev server. Both web and API TypeScript checks and an API TypeScript emit check pass. Four Node built-in tests cover search query validation. The API health request timed out, and PostgreSQL/Redis/Docker are unavailable here, so registration, authenticated data flows, and provider delivery could not be exercised end to end. Other workspace pages remain reviewed from source, not visually verified with live data; broader API, authorization, and browser integration tests remain.
+Reviewed 27 November 2026 against the current Next.js page components and API wiring. The web production build succeeds using an alternate output directory for this OneDrive-managed checkout; `/login` returned HTTP 200 from the local dev server. Web typecheck and API Nest build pass. Eight Node built-in tests cover search query boundaries and required-input trimming. The API health request timed out, and PostgreSQL/Redis/Docker are unavailable here, so registration, authenticated data flows, and provider delivery could not be exercised end to end. Other workspace pages remain reviewed from source, not visually verified with live data; broader API, authorization, and browser integration tests remain.
 
 ## What each page is for
 

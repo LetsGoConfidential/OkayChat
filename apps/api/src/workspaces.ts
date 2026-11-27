@@ -7,17 +7,18 @@ import { WorkspaceRole } from '@okaychat/db';
 import { createHash, randomBytes } from 'node:crypto';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';
+import { TrimInput } from './input-normalization';
 
 type RequestUser = { sub: string; workspaceId: string; role: WorkspaceRole; sessionId: string };
 type WorkspaceRequest = Request & { user: RequestUser; membership?: { id: string; workspaceId: string; userId: string; role: WorkspaceRole } };
 
 class UpdateWorkspaceDto {
-  @IsOptional() @IsString() @MinLength(2) name?: string;
+  @IsOptional() @TrimInput() @IsString() @MinLength(2) @MaxLength(120) name?: string;
   @IsOptional() @IsString() @IsTimeZone() timezone?: string;
 }
-class CreateWorkspaceDto { @IsString() @MinLength(2) name!: string; }
+class CreateWorkspaceDto { @TrimInput() @IsString() @MinLength(2) @MaxLength(120) name!: string; }
 class CreateWorkspaceInviteDto {
-  @IsEmail() @MaxLength(254) email!: string;
+  @TrimInput() @IsEmail() @MaxLength(254) email!: string;
   @IsEnum(WorkspaceRole) role!: WorkspaceRole;
 }
 class AcceptWorkspaceInviteDto { @IsString() @MinLength(32) @MaxLength(128) token!: string; }

@@ -6,6 +6,7 @@ import { ArrayMaxSize, IsArray, IsEnum, IsOptional, IsString, MaxLength, MinLeng
 import { Request } from 'express';
 import { AccessGuard, AuthModule } from './auth';
 import { DatabaseService } from './database';
+import { TrimInput } from './input-normalization';
 import { WorkspaceGuard, WorkspaceModule, WorkspaceRoles, WorkspaceRolesGuard } from './workspaces';
 
 type TenantRequest = Request & { user: { sub: string; workspaceId: string } };
@@ -13,16 +14,16 @@ const CAMPAIGN_QUEUE = 'okaychat-campaign-dispatch';
 const TERMINAL_RECIPIENT_STATUSES = [CampaignRecipientStatus.SENT, CampaignRecipientStatus.FAILED, CampaignRecipientStatus.SKIPPED];
 
 class CampaignCreateDto {
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
-  @IsOptional() @IsString() @MaxLength(100) templateName?: string;
-  @IsOptional() @IsString() @MaxLength(20) templateLanguage?: string;
+  @TrimInput() @IsString() @MinLength(1) @MaxLength(120) name!: string;
+  @IsOptional() @TrimInput() @IsString() @MaxLength(100) templateName?: string;
+  @IsOptional() @TrimInput() @IsString() @MaxLength(20) templateLanguage?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(5000) @IsString({ each: true }) contactIds?: string[];
 }
 
 class CampaignUpdateDto {
-  @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
-  @IsOptional() @IsString() @MaxLength(100) templateName?: string;
-  @IsOptional() @IsString() @MaxLength(20) templateLanguage?: string;
+  @IsOptional() @TrimInput() @IsString() @MinLength(1) @MaxLength(120) name?: string;
+  @IsOptional() @TrimInput() @IsString() @MaxLength(100) templateName?: string;
+  @IsOptional() @TrimInput() @IsString() @MaxLength(20) templateLanguage?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(5000) @IsString({ each: true }) contactIds?: string[];
   @IsOptional() @IsEnum(CampaignStatus) status?: CampaignStatus;
 }

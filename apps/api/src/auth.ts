@@ -7,15 +7,16 @@ import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { DatabaseService } from './database';
 import { isPlatformAdminEmail } from './platform-admin-access';
+import { TrimInput } from './input-normalization';
 
 class RegisterDto {
-  @IsString() @IsNotEmpty() name!: string;
-  @IsEmail() email!: string;
+  @TrimInput() @IsString() @MinLength(2) @MaxLength(120) name!: string;
+  @TrimInput() @IsEmail() email!: string;
   @MinLength(10) password!: string;
-  @IsOptional() @IsString() @MinLength(2) workspaceName?: string;
+  @IsOptional() @TrimInput() @IsString() @MinLength(2) @MaxLength(120) workspaceName?: string;
   @IsOptional() @IsString() @MinLength(32) @MaxLength(128) inviteToken?: string;
 }
-class LoginDto { @IsEmail() email!: string; @IsString() @IsNotEmpty() password!: string; }
+class LoginDto { @TrimInput() @IsEmail() email!: string; @IsString() @IsNotEmpty() password!: string; }
 class RefreshDto { @IsString() @IsNotEmpty() refreshToken!: string; }
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
